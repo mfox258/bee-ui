@@ -10,11 +10,13 @@ import '@/styles/index.scss' // global css
 import './icons' // icon
 import NProgress from 'nprogress' // progress bar
 import 'nprogress/nprogress.css' // progress bar style
- import VxeUIAll from 'vxe-pc-ui'
-            import 'vxe-pc-ui/lib/style.css'
-            import VxeUITable from 'vxe-table'
-            import 'vxe-table/lib/style.css'
+import VxeUIAll from 'vxe-pc-ui'
+import 'vxe-pc-ui/lib/style.css'
+import VxeUITable from 'vxe-table'
+import 'vxe-table/lib/style.css'
 
+Vue.use(VxeUIAll)
+Vue.use(VxeUITable)
 Vue.use(Element, {
   size: 'medium' // set element-ui default size
 })
@@ -23,7 +25,7 @@ Vue.config.productionTip = false
 
 NProgress.configure({ showSpinner: false }) // NProgress Configuration
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async(to, from, next) => {
   // start progress bar
   NProgress.start()
   if (to.meta.title !== undefined) {

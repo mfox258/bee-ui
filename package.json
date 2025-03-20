@@ -58,8 +58,8 @@
         "vue-count-to": "^1.0.13",
         "vue-router": "^3.6.5",
         "vuex": "^3.6.2",
-        "vxe-pc-ui": "^4.4.17",
-        "vxe-table": "^4.11.26",
+        "vxe-pc-ui": "3.4.19",
+        "vxe-table": "3.13.30",
         "xlsx": "^0.18.5"
     },
     "devDependencies": {
