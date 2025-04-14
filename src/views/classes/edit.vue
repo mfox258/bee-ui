@@ -5,8 +5,11 @@
       <el-form-item label="班次："  prop="classes" required>
         <el-input v-model="form.classes"></el-input>
       </el-form-item>
-      <el-form-item label="是否统计：" prop="isCount" required>
+      <el-form-item label="是否统计：" prop="isCount" >
         <el-input v-model="form.isCount"></el-input>
+      </el-form-item>
+      <el-form-item label="是否标红：" prop="color" >
+        <el-input v-model="form.color"></el-input>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submitForm">提交</el-button>
@@ -25,20 +28,14 @@ export default {
     return {
       form: {
         id: null,
-        code: '',
-        value: '',
-        type: ''
+        classes: '',
+        color: '',
+        isCount: ''
       },
       formLoading: false,
       rules: {
-        code: [
-          { required: true, message: '请输入编码', trigger: 'blur' }
-        ],
-        value: [
-          { required: true, message: '请输入值', trigger: 'blur' }
-        ],
-        type: [
-          { required: true, message: '请输入类型', trigger: 'blur' }
+        classes: [
+          { required: true, message: '请输入班次', trigger: 'blur' }
         ]
       }
     }
@@ -84,7 +81,8 @@ export default {
       this.form = {
         id: null,
         classes: '',
-        isCount: 0
+        isCount: 0,
+        color:0
       }
       this.form.id = lastId
     },

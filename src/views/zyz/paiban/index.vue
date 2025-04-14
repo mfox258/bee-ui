@@ -6,20 +6,27 @@
     <!-- 导出按钮 -->
     <el-button type="primary" @click="exportExcel" style="float: right">导出 Excel</el-button>
     <!-- 表格 -->
-    <vxe-table :data="tableData" border style="width: 100%;margin-top:12px" :edit-config="{
+    <vxe-table :data="tableData" border style="width: 100%;margin-top:5px" :edit-config="{
       trigger: 'click',
       mode: 'cell'
-    }">
-      <vxe-table-column field="userName" title="姓名" fixed width="80">
+    }" 
+    :row-config="{isCurrent: true}" 
+    :mouse-config="{highlight: true}">
+      <vxe-table-column field="userName" title="姓名" fixed="left" width="80">
         <template #header>
           <div>姓名</div>
           <div></div>
         </template>
       </vxe-table-column>
-      <vxe-table-column v-for="date in dates" :key="date" :field="date" width="120" :edit-render="{}">
+      <vxe-table-column v-for="date in dates" :key="date" :field="date" width="100" :edit-render="{}">
         <template #header>
-          <span>{{ date }}</span>
+          <!-- 格式化日期显示 -->
+          <span>{{ formatDate(date) }}</span>
           <div>{{ getWeekday(date) }}</div>
+        </template>
+         <!-- 默认渲染模板，使用 highlightText 方法处理单元格内容 -->
+        <template #default="scope">
+          <span v-html="highlightText(scope.row[date])"></span>
         </template>
         <template #edit="scope">
           <vxe-select v-model="scope.row[date]" filterable placeholder="请选择班次" @change="handleSelectChange(scope.row, date)">
@@ -29,13 +36,12 @@
       </vxe-table-column>
     </vxe-table>
     <!-- 按钮组 -->
-    <div class="button-group">
-      <el-button @click="handleCancel">取消</el-button>
-      <el-button type="primary" @click="handleSubmit">提交</el-button>
+    <div class="count_title">
+      <div>以下为实时统计：</div>
     </div>
     <!-- 统计表格 -->
     <vxe-table :data="stasticTableData" border style="width: 100%; margin-top: 20px">
-      <vxe-table-column field="userName" title="姓名" fixed width="100">
+      <vxe-table-column field="userName" title="姓名"  fixed="left" width="100">
         <template #header>
           <div>姓名</div>
         </template>
@@ -63,6 +69,8 @@ export default {
       tableData: [],
       dates: [],
       classOptions: [],
+      // 需要标红的班次选项
+      redClassOptions: [],
       listLoading: true,
       stasticTableHeaders: [],
       stasticTableData: []
@@ -71,6 +79,8 @@ export default {
   created() {
     this.initPage()
     this.refreshNewTable()
+    // 获取需要标红的班次选项
+    this.fetchClassTagRed()
   },
   methods: {
     // 获取当前月的所有日期
@@ -78,7 +88,7 @@ export default {
       const daysInMonth = new Date(year, month + 1, 0).getDate()
       const dateArray = []
       for (let i = 1; i <= daysInMonth; i++) {
-        const date = new Date(year, month, i)
+        const date = new Date(year, month, i+1)
         const formattedDate = date.toISOString().slice(0, 10)
         dateArray.push(formattedDate)
       }
@@ -136,6 +146,21 @@ export default {
           console.error('获取班次选项失败:', error)
         })
     },
+    // 获取班次标红
+    fetchClassTagRed() {
+      return classesApi
+        .getClassesList({color:1})
+        .then((data) => {
+          if (data && Array.isArray(data.response)) {
+            this.redClassOptions = data.response
+          } else {
+            console.error('获取标红的班次选项数据结构不符合预期:', data)
+          }
+        })
+        .catch((error) => {
+          console.error('获取标红班次选项失败:', error)
+        })
+    },
     // 处理年月选择变化
     handleMonthChange() {
       const [year, month] = this.selectedMonth.split('-')
@@ -145,14 +170,6 @@ export default {
     },
     // 处理下拉选择变化
     handleSelectChange(row, date) {
-      // 可以在这里添加额外的逻辑，例如验证等
-    },
-    // 处理取消按钮点击
-    handleCancel() {
-      // 可以在这里添加取消操作的逻辑
-    },
-    // 处理提交按钮点击
-    handleSubmit() {
       const schedulingInfos = []
       this.tableData.forEach((row) => {
         const { userName } = row
@@ -177,6 +194,8 @@ export default {
           this.refreshNewTable()
         })
         .catch((error) => {
+          Message.error('提交失败，请重试！')
+          this.refreshData
           console.error('提交失败:', error)
         })
     },
@@ -246,6 +265,30 @@ export default {
         .catch((error) => {
           console.error('获取表头数据失败:', error)
         })
+    },
+    // 格式化日期为 M月d日 格式
+    formatDate(date) {
+      const d = new Date(date)
+      const month = d.getMonth() + 1
+      const day = d.getDate()
+      return `${month}月${day}日`
+    },
+    // 高亮文本，将需要标红的部分用红色字体显示
+    highlightText(text) {
+      let result = text
+      this.redClassOptions.forEach((option) => {
+        // 使用正则表达式匹配需要标红的班次选项
+        const regex = new RegExp(option, 'g')
+        // 将匹配到的部分用红色字体包裹
+        result = result.replace(regex, `<span style="color: red;">${option}</span>`)
+      })
+      return result
+    },
+    // 刷新页面数据
+    refreshData() {
+      this.initPage()
+      this.refreshNewTable()
+      this.fetchClassTagRed()
     }
   }
 }
@@ -253,12 +296,13 @@ export default {
 
 <style scoped>
 .container {
-  padding: 20px;
+  padding: 10px;
 }
 
-.button-group {
-  margin-top: 20px;
-  text-align: right;
+.count_title {
+  margin-top: 10px;
+  text-align: left;
+  color: brown;
 }
 
 /* 让表头不换行 */
