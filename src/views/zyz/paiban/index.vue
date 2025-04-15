@@ -11,18 +11,17 @@
       </div>
     </div>
     <!-- 表格 -->
-    <vxe-table ref="tableRef" :data="tableData" border style="width: 100%;margin-top:5px" :edit-config="{
+    <vxe-table ref="tableRef" :data="tableData" border style="width: 100%;margin-top:5px" :edit-config="this.userName==='admin'?{
       trigger: 'click',
       mode: 'cell'
-    }" :row-config="{isCurrent: true}" :mouse-config="{highlight: true}">
+    }:undefined" :row-config="{isCurrent: true}" :mouse-config="{highlight: true}">
       <vxe-table-column field="userName" title="姓名" fixed="left" width="80">
         <template #header>
           <div>姓名</div>
           <div></div>
         </template>
       </vxe-table-column>
-      <vxe-table-column v-for="date in dates" :key="date" :field="date" width="100" :title="formatDate(date)+' '+getWeekday(date)" :edit-render="{}">
-        <template #header>
+      <vxe-table-column v-for="date in dates" :key="date" :field="date" width="100" :title="formatDate(date)+'<br/>'+getWeekday(date)" :edit-render="{}">        <template #header>
           <!-- 格式化日期显示 -->
           <span>{{ formatDate(date) }}</span>
           <div>{{ getWeekday(date) }}</div>
@@ -56,11 +55,17 @@
         </template>
       </vxe-table-column>
     </vxe-table>
-    <el-dialog title="请选择打印的列" :visible.sync="dialogVisible" width="30%">
-      <el-select v-model="selectDates" multiple placeholder="请选择" style="width:100%" collapse-tags>
-        <el-option v-for="item in dates" :key="item" :label="item" :value="item">
-        </el-option>
-      </el-select>
+  <el-dialog title="请选择打印的日期区间" :visible.sync="dialogVisible" width="30%">
+      <el-date-picker
+        v-model="printDateRange"
+        type="daterange"
+        range-separator="至"
+        start-placeholder="开始日期"
+        end-placeholder="结束日期"
+        format="yyyy-MM-dd"
+        value-format="yyyy-MM-dd"
+        style="width: 100%">
+      </el-date-picker>
       <span slot="footer">
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="printPaper">确定</el-button>
@@ -75,6 +80,8 @@ import classesApi from "@/api/classes";
 import schedulingApi from "@/api/scheduling";
 import axios from "axios";
 import "vxe-table/lib/style.css";
+import { mapGetters, mapMutations } from 'vuex'
+
 
 export default {
   data() {
@@ -90,10 +97,19 @@ export default {
       stasticTableData: [],
 
       dialogVisible: false,
-      selectDates: [],
+      printDateRange: [],
     };
   },
+  computed: {
+    ...mapGetters([
+      'sidebar',
+      'device',
+      'userName'
+    ])
+  },
   created() {
+    console.error("当前登录:", this.userName);
+
     this.initPage();
     this.refreshNewTable();
     // 获取需要标红的班次选项
@@ -311,8 +327,13 @@ export default {
       this.fetchClassTagRed();
     },
     printPaper() {
+      if (this.printDateRange.length === 0) {
+        console.error("请选择日期区间");
+        return;
+      }
+      const [startDate, endDate] = this.printDateRange;
       const columns = [{ field: "userName" }];
-      const dateColumns = this.selectDates.map((i) => {
+      const dateColumns = this.dates.filter(date => date >= startDate && date <= endDate).map(i => {
         return { field: i };
       });
       const printColuns = columns.concat(dateColumns);
@@ -327,7 +348,20 @@ export default {
             // 使用 DOMParser 来解析字符串
             let parser = new DOMParser();
             let dom = parser.parseFromString(content, "text/html");
+            // 从 selectedMonth 中提取月份
+            const [year, month] = this.selectedMonth.split('-');
+            // 动态生成标题
+            const title = `重庆市巴南区接龙镇中心卫生院${month}月外科护士排班`;
+            // 创建标题元素
+            let titleElement = document.createElement('div');
+            titleElement.textContent = title; // 这里可以修改标题内容
+            titleElement.style.textAlign = 'center';
+            titleElement.style.fontSize = '20px';
+            titleElement.style.fontWeight = 'bold';
+            titleElement.style.marginBottom = '10px';
 
+            // 将标题元素插入到表格之前
+            dom.body.insertBefore(titleElement, dom.body.firstChild);
             // 模糊查找所有包含 <div> 的元素
             let divs = dom.querySelectorAll("td div");
 
@@ -341,6 +375,7 @@ export default {
               );
                })
             });
+            
             const html = dom.body.innerHTML;
             return html;
           },
