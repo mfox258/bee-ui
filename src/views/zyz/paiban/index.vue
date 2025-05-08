@@ -53,6 +53,9 @@
         <template #header>
           <div>{{ header }}</div>
         </template>
+        <template #default="scope">
+          <span :class="{'red-cell': scope.row[header] > 0}">{{ scope.row[header] }}</span>
+        </template>
       </vxe-table-column>
     </vxe-table>
   <el-dialog title="请选择打印的日期区间" :visible.sync="dialogVisible" width="30%">
@@ -404,5 +407,8 @@ export default {
 .flexBox {
   display: flex;
   justify-content: space-between;
+}
+.red-cell {
+  color: red;
 }
 </style>

@@ -15,7 +15,7 @@
     <el-table v-loading="listLoading" :data="tableData" border fit highlight-current-row style="width: 100%">
       <el-table-column prop="id" label="Id" />
       <el-table-column prop="classes" label="班次"/>
-      <el-table-column prop="isCount" label="是否统计" />
+      <el-table-column prop="isCount" label="是否展示在统计列表" />
       <el-table-column prop="color" label="是否标红" />
       <el-table-column width="270px" label="操作" align="center">
         <template slot-scope="{row}">

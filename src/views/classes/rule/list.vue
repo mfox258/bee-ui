@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParam" ref="queryForm" :inline="true">
-      <el-form-item label="关键字：">
+      <el-form-item label="筛选班次：">
         <el-input v-model="queryParam.keyword"></el-input>
       </el-form-item>
       <el-form-item>

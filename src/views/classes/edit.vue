@@ -1,11 +1,11 @@
 <template>
   <div class="app-container">
 
-    <el-form :model="form" ref="form" label-width="100px" v-loading="formLoading" :rules="rules">
+    <el-form :model="form" ref="form" label-width="200px" v-loading="formLoading" :rules="rules">
       <el-form-item label="班次："  prop="classes" required>
         <el-input v-model="form.classes"></el-input>
       </el-form-item>
-      <el-form-item label="是否统计：" prop="isCount" >
+      <el-form-item label="是否展示在统计列表：" prop="isCount" >
         <el-input v-model="form.isCount"></el-input>
       </el-form-item>
       <el-form-item label="是否标红：" prop="color" >
