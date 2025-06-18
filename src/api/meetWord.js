@@ -1,5 +1,5 @@
 import { post } from '@/utils/request'
 
 export default {
-  test: query => post('/api/temp/test', query)
+  export: query => post('/api/meet/word/export', query)
   }
