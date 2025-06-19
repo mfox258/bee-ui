@@ -1,20 +1,12 @@
 <template>
   <div class="container">
     <div class="flexBox">
-      <!-- 月份范围选择器 -->
-      <el-date-picker
-        v-model="monthRange"
-        type="monthrange"
-        range-separator="至"
-        start-placeholder="开始月份"
-        end-placeholder="结束月份"
-        format="yyyy-MM"
-        value-format="yyyy-MM"
-        @change="handleMonthRangeChange"
-        placeholder="选择月份区间">
-      </el-date-picker>
+      <!-- 年月选择器 -->
+      <el-date-picker v-model="selectedMonth" type="month" format="yyyy-MM" value-format="yyyy-MM"
+        @change="handleMonthChange" placeholder="选择年月"></el-date-picker>
       <div>
         <el-button type="primary" @click="dialogVisible=true">打印</el-button>
+        <!-- 导出按钮 -->
         <el-button type="primary" @click="exportExcel">导出 Excel</el-button>
       </div>
     </div>
@@ -26,13 +18,15 @@
       <vxe-table-column field="userName" title="姓名" fixed="left" width="80">
         <template #header>
           <div>姓名</div>
+          <div></div>
         </template>
       </vxe-table-column>
-      <vxe-table-column v-for="date in dates" :key="date" :field="date" width="100" :title="formatDate(date)+'<br/>'+getWeekday(date)" :edit-render="{}">
-        <template #header>
+      <vxe-table-column v-for="date in dates" :key="date" :field="date" width="100" :title="formatDate(date)+'<br/>'+getWeekday(date)" :edit-render="{}">        <template #header>
+          <!-- 格式化日期显示 -->
           <span>{{ formatDate(date) }}</span>
           <div>{{ getWeekday(date) }}</div>
         </template>
+        <!-- 默认渲染模板，使用 highlightText 方法处理单元格内容 -->
         <template #default="scope">
           <span v-html="highlightText(scope.row[date])"></span>
         </template>
@@ -64,7 +58,7 @@
         </template>
       </vxe-table-column>
     </vxe-table>
-    <el-dialog title="请选择打印的日期区间" :visible.sync="dialogVisible" width="30%">
+  <el-dialog title="请选择打印的日期区间" :visible.sync="dialogVisible" width="30%">
       <el-date-picker
         v-model="printDateRange"
         type="daterange"
@@ -75,12 +69,12 @@
         value-format="yyyy-MM-dd"
         style="width: 100%">
       </el-date-picker>
-      <!-- 新增备注输入区域 -->
+        <!-- 新增备注输入区域 -->
       <div style="margin-top: 15px;">
         <el-form>
-          <el-form-item label="备注">
-            <el-input v-model="printRemark" type="textarea" rows="3" placeholder="请输入打印备注内容"></el-input>
-          </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="printRemark" type="textarea" rows="3" placeholder="请输入打印备注内容"></el-input>
+        </el-form-item>
         </el-form>
       </div>
       <span slot="footer">
@@ -103,11 +97,7 @@ import { mapGetters, mapMutations } from 'vuex'
 export default {
   data() {
     return {
-      // 月份范围选择，格式为["yyyy-MM", "yyyy-MM"]
-      monthRange: [
-        new Date().toISOString().slice(0, 7),
-        new Date().toISOString().slice(0, 7)
-      ],
+      selectedMonth: new Date().toISOString().slice(0, 7),
       tableData: [],
       dates: [],
       classOptions: [],
@@ -127,61 +117,32 @@ export default {
       'sidebar',
       'device',
       'userName'
-    ]),
-    // 计算开始月份和结束月份
-    startMonth() {
-      return this.monthRange[0];
-    },
-    endMonth() {
-      return this.monthRange[1];
-    }
+    ])
   },
   created() {
     console.error("当前登录:", this.userName);
+
     this.initPage();
     this.refreshNewTable();
+    // 获取需要标红的班次选项
     this.fetchClassTagRed();
   },
   methods: {
-    // 获取两个月份之间的所有日期 - 修复版本
-    getDatesBetweenMonths(startMonth, endMonth) {
-      const dates = [];
-      const start = new Date(startMonth + '-01');
-      const end = new Date(endMonth + '-01');
-      
-      // 计算结束月份的最后一天
-      const lastDayOfEndMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0);
-      
-      // 循环遍历每个月
-      for (let month = new Date(start); month <= end; month.setMonth(month.getMonth() + 1)) {
-        const year = month.getFullYear();
-        const monthNum = month.getMonth();
-        let daysInMonth;
-        
-        // 如果是结束月份，使用计算出的最后一天
-        if (month.getFullYear() === end.getFullYear() && month.getMonth() === end.getMonth()) {
-          daysInMonth = lastDayOfEndMonth.getDate();
-        } else {
-          daysInMonth = new Date(year, monthNum + 1, 0).getDate();
-        }
-        
-        // 获取当月的所有日期
-        for (let day = 1; day <= daysInMonth; day++) {
-          const date = new Date(year, monthNum, day+1);
-          dates.push(date.toISOString().slice(0, 10));
-        }
+    // 获取当前月的所有日期
+    getDatesInMonth(year, month) {
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const dateArray = [];
+      for (let i = 1; i <= daysInMonth; i++) {
+        const date = new Date(year, month, i + 1);
+        const formattedDate = date.toISOString().slice(0, 10);
+        dateArray.push(formattedDate);
       }
-      
-      return dates;
+      return dateArray;
     },
     // 初始化页面数据
     initPage() {
-      if (!this.monthRange || this.monthRange.length < 2) return;
-      
-      const startMonth = this.startMonth;
-      const endMonth = this.endMonth;
-      this.dates = this.getDatesBetweenMonths(startMonth, endMonth);
-      
+      const [year, month] = this.selectedMonth.split("-");
+      this.dates = this.getDatesInMonth(parseInt(year), parseInt(month) - 1);
       Promise.all([this.fetchScheduleData(), this.fetchClassOptions()]).then(
         () => {
           this.listLoading = false;
@@ -191,10 +152,7 @@ export default {
     // 获取排班数据
     fetchScheduleData() {
       return userApi
-        .getUserList({ 
-          startMonth: this.startMonth, 
-          endMonth: this.endMonth 
-        })
+        .getUserList({ queryMonth: this.selectedMonth })
         .then((data) => {
           if (data && Array.isArray(data.response)) {
             const { response } = data;
@@ -248,13 +206,10 @@ export default {
           console.error("获取标红班次选项失败:", error);
         });
     },
-    // 处理月份范围选择变化
-    handleMonthRangeChange() {
-      if (!this.monthRange || this.monthRange.length < 2) return;
-      
-      const startMonth = this.startMonth;
-      const endMonth = this.endMonth;
-      this.dates = this.getDatesBetweenMonths(startMonth, endMonth);
+    // 处理年月选择变化
+    handleMonthChange() {
+      const [year, month] = this.selectedMonth.split("-");
+      this.dates = this.getDatesInMonth(parseInt(year), parseInt(month) - 1);
       this.fetchScheduleData();
       this.refreshNewTable();
     },
@@ -269,15 +224,14 @@ export default {
               classes: row[date],
               userName,
               date,
-              month: this.startMonth, // 使用开始月份作为参考
+              month: this.selectedMonth,
             });
           }
         });
       });
       schedulingApi
         .editScheduling({
-          startMonth: this.startMonth,
-          endMonth: this.endMonth,
+          month: this.selectedMonth,
           schedulingInfos,
         })
         .then(() => {
@@ -286,7 +240,7 @@ export default {
         })
         .catch((error) => {
           Message.error("提交失败，请重试！");
-          this.refreshData();
+          this.refreshData;
           console.error("提交失败:", error);
         });
     },
@@ -299,8 +253,7 @@ export default {
     // 导出 Excel
     exportExcel() {
       const param = {
-        startMonth: this.startMonth,
-        endMonth: this.endMonth
+        month: this.selectedMonth,
       };
       axios({
         url: "/api/admin/scheduling/export",
@@ -312,17 +265,12 @@ export default {
         const a = document.createElement("a");
         a.style.display = "none";
         a.href = blobUrl;
-        a.download = `${this.startMonth}至${this.endMonth}排班表.xls`;
+        a.download = "aaa.xls";
         a.click();
       });
     },
     // 刷新新表格
     refreshNewTable() {
-      if (!this.monthRange || this.monthRange.length < 2) return;
-      
-      const startMonth = this.startMonth;
-      const endMonth = this.endMonth;
-      
       // 获取新表格的表头
       classesApi
         .getClassesList({ isCount: 1 })
@@ -331,10 +279,7 @@ export default {
             this.stasticTableHeaders = data.response;
             // 获取新表格的数据
             schedulingApi
-              .schedulingStastic({ 
-                startMonth: startMonth, 
-                endMonth: endMonth 
-              })
+              .schedulingStastic({ month: this.selectedMonth })
               .then((res) => {
                 if (res && Array.isArray(res.response)) {
                   const userMap = new Map();
@@ -415,13 +360,13 @@ export default {
             // 使用 DOMParser 来解析字符串
             let parser = new DOMParser();
             let dom = parser.parseFromString(content, "text/html");
-            // 从 monthRange 中提取月份区间
-            const [startYearMonth, endYearMonth] = this.monthRange;
+            // 从 selectedMonth 中提取月份
+            const [year, month] = this.selectedMonth.split('-');
             // 动态生成标题
-            const title = `重庆市巴南区接龙镇中心卫生院${startYearMonth}至${endYearMonth}外科护士排班`;
+            const title = `重庆市巴南区接龙镇中心卫生院${month}月外科护士排班`;
             // 创建标题元素
             let titleElement = document.createElement('div');
-            titleElement.textContent = title;
+            titleElement.textContent = title; // 这里可以修改标题内容
             titleElement.style.textAlign = 'center';
             titleElement.style.fontSize = '20px';
             titleElement.style.fontWeight = 'bold';
