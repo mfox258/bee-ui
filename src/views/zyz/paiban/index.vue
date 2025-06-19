@@ -418,7 +418,7 @@ export default {
             // 从 monthRange 中提取月份区间
             const [startYearMonth, endYearMonth] = this.monthRange;
             // 动态生成标题
-            const title = `重庆市巴南区接龙镇中心卫生院${startYearMonth}至${endYearMonth}外科护士排班`;
+            const title = `重庆市巴南区接龙镇中心卫生院${startDate}至${endDate}外科护士排班`;
             // 创建标题元素
             let titleElement = document.createElement('div');
             titleElement.textContent = title;
