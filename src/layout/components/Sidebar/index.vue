@@ -43,10 +43,11 @@ export default {
     },
   },
   created() {
-    if (this.userName === "admin") {
-      this.authRoutes = this.routes;
+    if (this.userName !== "admin") {
+        this.authRoutes = this.routes.filter((i) => i.isAuth)
+
     } else {
-      this.authRoutes = this.routes.filter((i) => !i.isAuth)
+      this.authRoutes = this.routes;
     }
   },
 };

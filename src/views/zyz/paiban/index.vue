@@ -265,11 +265,16 @@ export default {
         const { userName } = row;
         this.dates.forEach((date) => {
           if (row[date]) {
+             // 从date字符串中提取月份信息
+        const dateObj = new Date(date);
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth() + 1; // 月份从0开始，所以需要+1
+        const formattedMonth = `${year}-${month < 10 ? '0' + month : month}`; // 格式化为yyyy-MM
             schedulingInfos.push({
               classes: row[date],
               userName,
               date,
-              month: this.startMonth, // 使用开始月份作为参考
+              month: formattedMonth, // 使用开始月份作为参考
             });
           }
         });
