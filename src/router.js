@@ -89,6 +89,12 @@ const constantRoutes = [
         component: () => import('@/views/zyz/paiban/index'),
         name: 'Temp',
         meta: { title: '排班管理', noCache: true }
+      },
+      {
+        path: 'paiban/statistic',
+        component: () => import('@/views/zyz/paiban/statistic'),
+        name: 'Temp',
+        meta: { title: '排班统计', noCache: true }
       }
     ]
   },

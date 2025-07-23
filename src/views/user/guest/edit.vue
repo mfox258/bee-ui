@@ -25,11 +25,11 @@
       <el-form-item label="手机：">
         <el-input v-model="form.phone"></el-input>
       </el-form-item>
-      <el-form-item label="等级：">
+      <el-form-item label="排序：">
         <el-input v-model="form.userLevel"></el-input>
-        <!-- <el-select v-model="form.userLevel" placeholder="等级">
-          <el-option v-for="item in levelEnum" :key="item.key" :value="item.key" :label="item.value"></el-option>
-        </el-select> -->
+      </el-form-item>
+      <el-form-item label="职称：">
+        <el-input v-model="form.jobRank"></el-input>
       </el-form-item>
       <el-form-item label="状态：" required>
         <el-select v-model="form.status" placeholder="状态">
@@ -62,7 +62,8 @@ export default {
         sex: '',
         birthDay: null,
         phone: null,
-        userLevel: ''
+        userLevel: '',
+        jobRank: ''
       },
       formLoading: false,
       rules: {
@@ -124,7 +125,8 @@ export default {
         sex: '',
         birthDay: null,
         phone: null,
-        userLevel: ''
+        userLevel: '',
+        jobRank: ''
       }
       this.form.id = lastId
     },
