@@ -382,8 +382,10 @@ export default {
     highlightText(text) {
       let result = text;
       this.redClassOptions.forEach((option) => {
-        // 使用正则表达式匹配需要标红的班次选项
-        const regex = new RegExp(option, "g");
+        // 转义正则表达式特殊字符
+        const escapedOption = option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // 使用转义后的选项创建正则表达式
+        const regex = new RegExp(escapedOption, "g");
         // 将匹配到的部分用红色字体包裹
         result = result.replace(
           regex,
