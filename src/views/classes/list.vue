@@ -15,8 +15,22 @@
     <el-table v-loading="listLoading" :data="tableData" border fit highlight-current-row style="width: 100%">
       <el-table-column prop="id" label="Id" />
       <el-table-column prop="classes" label="班次"/>
-      <el-table-column prop="isCount" label="是否展示在统计列表" />
-      <el-table-column prop="color" label="是否标红" />
+      <el-table-column prop="isCount" label="是否展示在统计列表">
+        <template slot-scope="scope">
+          {{ scope.row.isCount === 1 ? '是' : '否' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="color" label="是否标红">
+        <template slot-scope="scope">
+          {{ scope.row.color === 1 ? '是' : '否' }}
+        </template>
+      </el-table-column>
+      <!-- 新增是否启用列 -->
+      <el-table-column prop="status" label="是否启用">
+        <template slot-scope="scope">
+          {{ scope.row.status === 1 ? '是' : '否' }}
+        </template>
+      </el-table-column>
       <el-table-column width="270px" label="操作" align="center">
         <template slot-scope="{row}">
           <router-link :to="{path:'/classes/edit', query:{id:row.id}}" class="link-left">
@@ -58,7 +72,13 @@ export default {
       this.listLoading = true
       classesApi.getClassesPage(this.queryParam).then(data => {
         const re = data.response
-        this.tableData = re.list
+        // 转换所有状态字段为数值类型
+        this.tableData = re.list.map(item => ({
+          ...item,
+          isCount: Number(item.isCount),
+          color: Number(item.color),
+          status: Number(item.status)
+        }))
         this.total = re.total
         this.queryParam.pageIndex = re.pageNum
         this.listLoading = false

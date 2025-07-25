@@ -38,7 +38,10 @@
         </el-select>
       </el-form-item>
       <el-form-item label="比例">
-        <el-input v-model="classInfo.ratio" class="same-width-input"></el-input>
+        <el-radio-group v-model="classInfo.ratio" class="same-width-input">
+          <el-radio :label="0.5">50%</el-radio>
+          <el-radio :label="1">100%</el-radio>
+        </el-radio-group>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submitClass">提交</el-button>
@@ -58,7 +61,7 @@ export default {
         id: null,
         classes: '',
         targetClasses: '',
-        ratio: 0
+        ratio: 1 // 设置默认值为1(100%)
       },
       ratioDisplay: '',
       classOptions: [],
@@ -75,23 +78,21 @@ export default {
     }
   },
   watch: {
-    'classInfo.ratio': {
-      immediate: true,
-      handler(newValue) {
-        this.ratioDisplay = newValue;
-      }
-    }
+    // 移除ratio的watch监听，因为不再需要处理输入框的格式化
   },
   created() {
     const id = this.$route.query.id
     let _this = this
-    // this.getClassesOptions();
     this.getTargetClassesOptions();
     if (id && parseInt(id) !== 0) {
       _this.formLoading = true
       classesRuleApi.selectClassesRule(id).then(re => {
         _this.classInfo = re.response
         _this.formLoading = false
+        // 编辑模式下自动加载班次数据
+        if (_this.classInfo.targetClasses) {
+          _this.getClassesOptions();
+        }
       })
     }
   },
@@ -109,11 +110,23 @@ export default {
       this.getClassesOptions();
     },
     getClassesOptions() {
-      classesApi.getClassesList({isCount:'0', targetClasses: this.classInfo.targetClasses}).then(response => {
+      // 添加调试日志
+      console.log('获取班次数据，目标班次:', this.classInfo.targetClasses)
+      classesApi.getClassesList({
+        isCount:'0', 
+        targetClasses: this.classInfo.targetClasses
+      }).then(response => {
         if (response.code === 1) {
           this.classOptions = response.response
           this.filteredCodeOptions = response.response
+          console.log('班次数据加载成功:', response.response)
+        } else {
+          console.error('班次数据加载失败:', response.message)
+          this.$message.error('获取班次数据失败: ' + response.message)
         }
+      }).catch(error => {
+        console.error('班次API调用异常:', error)
+        this.$message.error('获取班次数据时发生错误')
       })
     },
     filterClasses(query) {
@@ -168,4 +181,4 @@ export default {
 .el-form-item .el-select {
   width: 200px;
 }
-</style>    
+</style>

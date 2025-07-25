@@ -52,6 +52,15 @@
       <vxe-table-column field="jobRank" title="职称" width="80" :edit-render="{name: 'input'}"></vxe-table-column>
       <vxe-table-column field="nursingQuality" title="护理质量" width="100" :edit-render="{name: 'input'}"></vxe-table-column>
       <vxe-table-column field="leaveDays" title="休假" width="80" :edit-visible="false"></vxe-table-column>
+      <vxe-table-column field="sumDays" title="总天数" width="80" :edit-visible="false">
+        <template #header>
+          <span class="blue-cell">总天数</span>
+        </template>
+        <template #default="scope">
+          <span class="blue-cell">{{ scope.row.sumDays }}</span>
+        </template>
+      </vxe-table-column>
+
     </vxe-table>
   </div>
 </template>
@@ -150,6 +159,7 @@ export default {
             jobRank: oldUserData.jobRank || '',
             nursingQuality: oldUserData.nursingQuality || '100',
             leaveDays: 0, // 休假列将刷新
+            sumDays: 0,
             ...Object.fromEntries(this.tableHeaders.map(header => [header, 0]))
           });
         }
@@ -166,6 +176,8 @@ export default {
           userData.leaveDays = Number(count); // 匹配休假
         }else if (classes === '职称') {
           userData.jobRank =  Number(count); // 匹配职称
+        }else if (classes === '总天数') {
+          userData.sumDays =  Number(count); // 匹配职称
         }
       });
         this.statisticData = Array.from(userMap.values());
@@ -192,7 +204,8 @@ export default {
           '质控': row.qualityControl,
           '职称': row.jobRank,
           '护理质量': row.nursingQuality,
-          '休假': row.leaveDays
+          '休假': row.leaveDays,
+          '总天数': row.sumDays
         };
         // 添加各班次统计
         this.tableHeaders.forEach(header => {
@@ -213,7 +226,7 @@ export default {
       const $table = this.$refs.statisticTable;
       if (!$table) return;
   
-      // 解析选择的年月（修复错误，使用monthRange）
+      // 解析选择的年月
       const [selectedYear, selectedMonth] = this.monthRange.split('-');
       const monthText = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'][parseInt(selectedMonth) - 1];
       const title = `${selectedYear}年外科${monthText}护理工作量统计`;
@@ -224,7 +237,7 @@ export default {
           // 创建DOM解析器
           const parser = new DOMParser();
           const dom = parser.parseFromString(content, "text/html");
-
+  
           // 创建标题元素
           const titleElement = document.createElement('div');
           titleElement.textContent = title;
@@ -232,7 +245,7 @@ export default {
           titleElement.style.fontSize = '20px';
           titleElement.style.fontWeight = 'bold';
           titleElement.style.marginBottom = '15px';
-
+  
           // 添加备注信息
           if (this.printRemark) {
             const remarkElement = document.createElement('div');
@@ -241,10 +254,28 @@ export default {
             remarkElement.style.marginTop = '10px';
             dom.body.appendChild(remarkElement);
           }
-
+  
           // 将标题插入到表格之前
           dom.body.insertBefore(titleElement, dom.body.firstChild);
-
+  
+          // 设置总天数列标题和内容为蓝色
+          const thElements = dom.querySelectorAll('th');
+          thElements.forEach(th => {
+            if (th.textContent.trim() === '总天数') {
+              th.style.color = 'blue';
+            }
+          });
+  
+          const tdElements = dom.querySelectorAll('td');
+          tdElements.forEach(td => {
+            // 检查该单元格是否属于总天数列
+            const thIndex = Array.from(td.parentElement.children).indexOf(td);
+            const correspondingTh = thElements[thIndex];
+            if (correspondingTh && correspondingTh.textContent.trim() === '总天数') {
+              td.style.color = 'blue';
+            }
+          });
+  
           return dom.body.innerHTML;
         }
       });
@@ -290,5 +321,8 @@ export default {
   display: flex;
   margin-bottom: 15px;
   align-items: center;
+}
+.blue-cell {
+  color: blue !important;
 }
 </style>

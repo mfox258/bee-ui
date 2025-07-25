@@ -382,15 +382,16 @@ export default {
     highlightText(text) {
       let result = text;
       this.redClassOptions.forEach((option) => {
-        // 转义正则表达式特殊字符
+        // Add null check before using replace()
+        if (!option) return;
         const escapedOption = option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // 使用转义后的选项创建正则表达式
         const regex = new RegExp(escapedOption, "g");
-        // 将匹配到的部分用红色字体包裹
-        result = result.replace(
-          regex,
-          `<span style="color: red;">${option}</span>`
-        );
+         if (result) {
+          result = result.replace(
+            regex,
+            `<span style="color: red;">${option}</span>`
+          );
+        }
       });
       return result;
     },
@@ -411,47 +412,40 @@ export default {
         return { field: i };
       });
       const printColuns = columns.concat(dateColumns);
-
+  
       const $table = this.$refs.tableRef;
       if ($table) {
         $table.print({
-          // 打印指定列
           columns: printColuns,
-          // 打印之前拼接自定义模板
           beforePrintMethod: ({ content }) => {
-            // 使用 DOMParser 来解析字符串
             let parser = new DOMParser();
             let dom = parser.parseFromString(content, "text/html");
-            // 从 monthRange 中提取月份区间
             const [startYearMonth, endYearMonth] = this.monthRange;
-            // 动态生成标题
             const title = `重庆市巴南区接龙镇中心卫生院${startDate}至${endDate}外科护士排班`;
-            // 创建标题元素
             let titleElement = document.createElement('div');
             titleElement.textContent = title;
             titleElement.style.textAlign = 'center';
             titleElement.style.fontSize = '20px';
             titleElement.style.fontWeight = 'bold';
             titleElement.style.marginBottom = '10px';
-
-            // 将标题元素插入到表格之前
             dom.body.insertBefore(titleElement, dom.body.firstChild);
-            // 模糊查找所有包含 <div> 的元素
             let divs = dom.querySelectorAll("td div");
-
-            // 遍历找到的所有 <div> 元素
+  
             divs.forEach((div) => {
-               this.redClassOptions.forEach((option) => {
-              const regex = new RegExp(option, "g");
-              div.innerHTML = div.innerHTML.replace(
-                regex,
-                `<span style="color:red">${option}</span>`
-              );
-               })
+              this.redClassOptions.forEach((option) => {
+                // 添加空值检查（修复核心代码）
+                if (!option) return;
+                // 添加正则特殊字符转义
+                const escapedOption = option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // 使用转义后的选项创建正则表达式
+                const regex = new RegExp(escapedOption, "g");
+                div.innerHTML = div.innerHTML.replace(
+                  regex,
+                  `<span style="color:red">${option}</span>`
+                );
+              });
             });
-            
-            
-              // 新增：在表格下方添加备注内容
+  
             if (this.printRemark) {
               const remarkElement = document.createElement('div');
               remarkElement.style.marginTop = '20px';
@@ -459,7 +453,7 @@ export default {
               remarkElement.innerHTML = `<div style="font-size: 16px; margin-bottom: 5px;">备注：</div><div>${this.printRemark}</div>`;
               dom.body.appendChild(remarkElement);
             }
-
+  
             const html = dom.body.innerHTML;
             return html;
           },
