@@ -73,6 +73,7 @@
         end-placeholder="结束日期"
         format="yyyy-MM-dd"
         value-format="yyyy-MM-dd"
+        :picker-options="disabledDateRange"
         style="width: 100%">
       </el-date-picker>
       <!-- 新增备注输入区域 -->
@@ -119,7 +120,32 @@ export default {
 
       dialogVisible: false,
       printDateRange: [],
-      printRemark: ''// 打印备注内容
+      printRemark: '',// 打印备注内容
+      disabledDateRange:{
+        // 改为箭头函数，确保this指向Vue组件实例
+        disabledDate: (date) => {
+          // 如果未选择月份区间，不禁用任何日期
+          if (!this.monthRange || this.monthRange.length < 2) {
+            return false;
+          }
+          console.info( this.monthRange)
+          // 解析选中的月份区间（格式：yyyy-MM）
+          const [startMonth, endMonth] = this.monthRange;
+          // 解析年月
+          const [startYear, startMonthNum] = startMonth.split('-').map(Number);
+          const [endYear, endMonthNum] = endMonth.split('-').map(Number);
+          // 使用UTC方法创建日期，确保时区一致性
+          const start = new Date(Date.UTC(startYear, startMonthNum - 1, 0));
+          console.info('UTC start:', start.getTime());
+          // 转换为当月最后一天（UTC时间23:59:59）
+          const end = new Date(Date.UTC(endYear, endMonthNum, -1, 23, 59, 59));
+          console.info('UTC end:', end.getTime());
+          // 统一转换为UTC时间戳比较
+          const currentTime = new Date(date).getTime();
+          console.info('currentTime:', currentTime);
+          return currentTime < start.getTime() || currentTime > end.getTime();
+        }
+      }
     };
   },
   computed: {
