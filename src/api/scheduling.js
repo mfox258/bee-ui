@@ -4,5 +4,6 @@ export default {
   editScheduling: query => post('/api/admin/scheduling/edit', query),
   export: query => get('/api/admin/scheduling/export', query),
   schedulingStastic: query => get('/api/admin/scheduling/statistics/list', query),
-  schedulingStastic1: query => get('/api/admin/scheduling/statistic', query)
+  schedulingStastic1: query => get('/api/admin/scheduling/statistic', query),
+  schedulingDownloadAttendance: query => get('/api/admin/scheduling/download/attendance', query)
 } 

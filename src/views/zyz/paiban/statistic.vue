@@ -16,6 +16,8 @@
       <el-button type="primary" @click="exportExcel" style="margin-left: 10px">导出Excel</el-button>
       <!-- 打印按钮 -->
       <el-button type="primary" @click="dialogVisible=true" style="margin-left: 10px">打印</el-button>
+      <!-- 下载考勤表按钮 -->
+      <el-button type="primary" @click="downloadAttendanceDialogVisible=true" style="margin-left: 10px">下载考勤表</el-button>
     </div>
     <!-- 打印对话框 -->
     <el-dialog title="打印设置" :visible.sync="dialogVisible" width="30%">
@@ -30,6 +32,28 @@
       <span slot="footer">
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="printPaper">确定</el-button>
+      </span>
+    </el-dialog>
+    <!-- 下载考勤表对话框 -->
+    <el-dialog title="选择年月" :visible.sync="downloadAttendanceDialogVisible" width="30%">
+      <div style="margin-top: 15px;">
+        <el-form>
+          <el-form-item label="选择月份">
+            <el-date-picker
+              v-model="selectedMonthRange"
+              type="month"
+              placeholder="选择月份"
+              format="yyyy-MM"
+              value-format="yyyy-MM"
+              style="width: 100%;"
+            >
+            </el-date-picker>
+          </el-form-item>
+        </el-form>
+      </div>
+      <span slot="footer">
+        <el-button @click="downloadAttendanceDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="downloadAttendance">确定</el-button>
       </span>
     </el-dialog>
     <!-- 统计表格 -->
@@ -70,18 +94,22 @@ import schedulingApi from "@/api/scheduling";
 import classesApi from "@/api/classes";
 import XLSX from 'xlsx';
 import { mapGetters } from 'vuex';
+import axios from 'axios'; // 直接导入axios库
 
 export default {
   name: 'NursingStatistic',
   data() {
     return {
       monthRange: new Date().toISOString().slice(0, 7), // 改为单个月份字符串
+      selectedMonthRange: new Date().toISOString().slice(0, 7), // 下载考勤表用的月份选择
       tableHeaders: [], // 统计表头（班次类型）
       statisticData: [], // 统计数据
       listLoading: false,
       // 打印相关变量
       dialogVisible: false,
-      printRemark: ''
+      printRemark: '',
+      // 下载考勤表相关变量
+      downloadAttendanceDialogVisible: false
     };
   },
   computed: {
@@ -280,6 +308,115 @@ export default {
         }
       });
       this.dialogVisible = false;
+    },
+
+    // 下载考勤表 - 修复版本
+    downloadAttendance() {
+      if (!this.selectedMonthRange) {
+        this.$message.warning("请选择要下载的月份");
+        return;
+      }
+      
+      // 解析选择的年月
+      const [year, month] = this.selectedMonthRange.split('-');
+      
+      try {
+        // 直接使用导入的axios，并设置responseType为blob
+        axios({
+          url: '/api/admin/scheduling/download/attendance',
+          method: 'get',
+          responseType: 'blob',
+          params: {
+            year: parseInt(year),
+            month: parseInt(month)
+          },
+          baseURL: process.env.VUE_APP_URL,
+          withCredentials: true,
+          timeout: 30000
+        }).then(response => {
+          // 检查响应是否成功
+          if (response.status === 200) {
+            // 尝试解析响应数据，检查是否是JSON格式的错误信息
+            const blob = new Blob([response.data]);
+            
+            // 创建一个FileReader来读取blob内容
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                // 尝试将响应解析为JSON
+                const errorData = JSON.parse(e.target.result);
+                if (errorData.code === 500 && errorData.msg) {
+                  // 如果是JSON格式且包含错误信息，显示错误
+                  this.$message.error(errorData.msg);
+                } else {
+                  // 否则，正常处理文件下载
+                  const blobUrl = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.style.display = 'none';
+                  a.href = blobUrl;
+                  a.download = `${year}年${month}月考勤表.xls`;
+                  document.body.appendChild(a);
+                  a.click();
+                  
+                  // 清理
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(blobUrl);
+                  
+                  this.$message.success("考勤表下载成功");
+                  this.downloadAttendanceDialogVisible = false;
+                }
+              } catch (jsonError) {
+                // 如果解析JSON失败，说明是正常的文件流
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = `${year}年${month}月考勤表.xls`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // 清理
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+                
+                this.$message.success("考勤表下载成功");
+                this.downloadAttendanceDialogVisible = false;
+              }
+            };
+            reader.readAsText(blob);
+          } else {
+            // 状态码不是200，显示错误
+            this.$message.error('下载失败，服务器返回错误状态码');
+          }
+        }).catch(error => {
+          console.error("下载考勤表失败:", error);
+          // 从错误响应中提取具体错误信息
+          let errorMsg = '下载失败，请重试';
+          if (error.response && error.response.data) {
+            if (error.response.data.msg) {
+              errorMsg = error.response.data.msg;
+            } else if (error.response.data.message) {
+              errorMsg = error.response.data.message;
+            } else {
+              // 尝试将错误数据转换为JSON字符串
+              try {
+                const errorData = JSON.parse(new TextDecoder().decode(error.response.data));
+                if (errorData.msg) {
+                  errorMsg = errorData.msg;
+                }
+              } catch (e) {
+                // 转换失败，使用默认错误信息
+              }
+            }
+          } else if (error.message) {
+            errorMsg = error.message;
+          }
+          this.$message.error(errorMsg);
+        });
+      } catch (error) {
+        console.error("下载考勤表过程中发生错误:", error);
+        this.$message.error('下载过程中发生错误');
+      }
     },
 
     // 处理单元格编辑保存
