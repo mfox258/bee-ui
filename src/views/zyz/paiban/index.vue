@@ -476,7 +476,7 @@ export default {
               const remarkElement = document.createElement('div');
               remarkElement.style.marginTop = '20px';
               remarkElement.style.fontWeight = 'bold';
-              remarkElement.innerHTML = `<div style="font-size: 16px; margin-bottom: 5px;">备注：</div><div>${this.printRemark}</div>`;
+              remarkElement.innerHTML = `<div style="font-size: 16px; margin-bottom: 5px;">备注：</div><div style="white-space: pre-wrap;">${this.printRemark}</div>`;
               dom.body.appendChild(remarkElement);
             }
   
