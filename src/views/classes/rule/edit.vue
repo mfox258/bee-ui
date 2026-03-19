@@ -19,11 +19,11 @@
           ></el-option>
         </el-select>
       </el-form-item>
-      <el-form-item label="班次">
+      <el-form-item label="班次" v-if="false">
         <el-select
           v-model="classInfo.classes"
           placeholder="请先选择目标班次"
-          :disabled="!classInfo.targetClasses"
+          :disabled="!classInfo.targetClasses || !!$route.query.classes"
           filterable
           remote
           :remote-method="filterClasses"
@@ -82,12 +82,19 @@ export default {
   },
   created() {
     const id = this.$route.query.id
+    const classes = this.$route.query.classes
     let _this = this
     this.getTargetClassesOptions();
+    if (classes) {
+      _this.classInfo.classes = classes
+    }
     if (id && parseInt(id) !== 0) {
       _this.formLoading = true
       classesRuleApi.selectClassesRule(id).then(re => {
-        _this.classInfo = re.response
+        _this.classInfo = {
+          ...re.response,
+          classes: classes || re.response.classes
+        }
         _this.formLoading = false
         // 编辑模式下自动加载班次数据
         if (_this.classInfo.targetClasses) {
@@ -157,8 +164,8 @@ export default {
       }
       classesRuleApi.classesRuleEdit(submitData).then(response => {
         if (response.code === 1) {
-          this.$router.push({ path: '/classes/rule/list' })
           this.$message.success(response.message)
+          this.$router.back()
         } else {
           this.$message.error(response.message)
         }

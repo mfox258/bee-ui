@@ -22,7 +22,7 @@
     <vxe-table ref="tableRef" :data="tableData" border style="width: 100%;margin-top:5px" :edit-config="this.userName==='admin'?{
       trigger: 'click',
       mode: 'cell'
-    }:undefined" :row-config="{isCurrent: true}" :mouse-config="{highlight: true}">
+    }:undefined" :row-config="{isCurrent: true}" :mouse-config="{highlight: true}" :cell-class-name="getCellClassName" :header-cell-class-name="getHeaderCellClassName" @cell-click="handleCellClick">
       <vxe-table-column field="userName" title="姓名" fixed="left" width="80">
         <template #header>
           <div>姓名</div>
@@ -30,8 +30,9 @@
       </vxe-table-column>
       <vxe-table-column v-for="date in dates" :key="date" :field="date" width="100" :title="formatDate(date)+'<br/>'+getWeekday(date)" :edit-render="{}">
         <template #header>
+          <span>{{ getWeekday(date) }}</span>
+          <br>
           <span>{{ formatDate(date) }}</span>
-          <div>{{ getWeekday(date) }}</div>
         </template>
         <template #default="scope">
           <span v-html="highlightText(scope.row[date])"></span>
@@ -117,6 +118,7 @@ export default {
       listLoading: true,
       stasticTableHeaders: [],
       stasticTableData: [],
+      activeColumnField: '',
 
       dialogVisible: false,
       printDateRange: [],
@@ -281,8 +283,25 @@ export default {
       const startMonth = this.startMonth;
       const endMonth = this.endMonth;
       this.dates = this.getDatesBetweenMonths(startMonth, endMonth);
+      this.activeColumnField = '';
       this.fetchScheduleData();
       this.refreshNewTable();
+    },
+    handleCellClick({ row, column }) {
+      this.activeColumnField = column && column.field ? column.field : '';
+      if (this.$refs.tableRef && row) {
+        this.$refs.tableRef.setCurrentRow(row);
+      }
+    },
+    getCellClassName({ column }) {
+      return this.activeColumnField && column && column.field === this.activeColumnField
+        ? 'column-active-cell'
+        : '';
+    },
+    getHeaderCellClassName({ column }) {
+      return this.activeColumnField && column && column.field === this.activeColumnField
+        ? 'column-active-cell'
+        : '';
     },
     // 处理下拉选择变化
     handleSelectChange(row, date) {
@@ -511,5 +530,8 @@ export default {
 }
 .red-cell {
   color: red;
+}
+::v-deep .vxe-table .column-active-cell {
+  background-color: #e8f4ff !important;
 }
 </style>

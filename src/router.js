@@ -119,17 +119,12 @@ const constantRoutes = [
         name: 'ClassesEditPage',
         meta: { title: '班次编辑', noCache: true , activeMenu: '/classes/list'},
         hidden: true
-      },{
-        path: 'rule/list',
-        component: () => import('@/views/classes/rule/list'),
-        name: 'RulePagePage',
-        meta: { title: '规则列表', noCache: true }
       },
       {
         path: 'rule/edit',
         component: () => import('@/views/classes/rule/edit'),
         name: 'RuleEditPage',
-        meta: { title: '规则编辑', noCache: true , activeMenu: '/classes/rule/list'},
+        meta: { title: '规则编辑', noCache: true , activeMenu: '/classes/list'},
         hidden: true
       }
     ]
