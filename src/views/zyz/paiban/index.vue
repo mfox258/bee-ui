@@ -13,7 +13,13 @@
         @change="handleMonthRangeChange"
         placeholder="选择月份区间">
       </el-date-picker>
-      <div>
+      <div class="daily-shift-summary" v-if="selectedDayClassCounts.length">
+        <span v-for="item in selectedDayClassCounts" :key="item.classes" class="daily-shift-chip"
+          :class="{ 'daily-shift-chip--red': redClassOptions.includes(item.classes) }">
+          {{ item.classes }} <b>{{ item.count }}</b>
+        </span>
+      </div>
+      <div class="action-buttons">
         <el-button type="primary" @click="dialogVisible=true">打印</el-button>
         <el-button type="primary" @click="exportExcel">导出 Excel</el-button>
       </div>
@@ -22,7 +28,7 @@
     <vxe-table ref="tableRef" :data="tableData" border style="width: 100%;margin-top:5px" :edit-config="this.userName==='admin'?{
       trigger: 'click',
       mode: 'cell'
-    }:undefined" :row-config="{isCurrent: true}" :mouse-config="{highlight: true}" :cell-class-name="getCellClassName" :header-cell-class-name="getHeaderCellClassName" @cell-click="handleCellClick">
+    }:undefined" :row-config="{isCurrent: true}" :mouse-config="{highlight: true}" :cell-class-name="getCellClassName" :header-cell-class-name="getHeaderCellClassName" @cell-click="handleCellClick" @header-cell-click="handleHeaderCellClick">
       <vxe-table-column field="userName" title="姓名" fixed="left" width="80">
         <template #header>
           <div>姓名</div>
@@ -38,7 +44,7 @@
           <span v-html="highlightText(scope.row[date])"></span>
         </template>
         <template #edit="scope">
-          <vxe-select v-model="scope.row[date]" filterable placeholder="请选择班次"
+          <vxe-select v-model="scope.row[date]" clearable filterable placeholder="请选择班次"
             @change="handleSelectChange(scope.row, date)">
             <vxe-option v-for="option in classOptions" :key="option" :label="option" :value="option"></vxe-option>
           </vxe-select>
@@ -119,6 +125,7 @@ export default {
       stasticTableHeaders: [],
       stasticTableData: [],
       activeColumnField: '',
+      editingCellValue: '',
 
       dialogVisible: false,
       printDateRange: [],
@@ -162,6 +169,20 @@ export default {
     },
     endMonth() {
       return this.monthRange[1];
+    },
+    selectedDayClassCounts() {
+      if (!this.dates.includes(this.activeColumnField)) return [];
+      const counts = {};
+      this.tableData.forEach((row) => {
+        const classes = row[this.activeColumnField];
+        if (classes) {
+          counts[classes] = (counts[classes] || 0) + 1;
+        }
+      });
+      return Object.keys(counts).map((classes) => ({
+        classes,
+        count: counts[classes]
+      }));
     }
   },
   created() {
@@ -284,14 +305,24 @@ export default {
       const endMonth = this.endMonth;
       this.dates = this.getDatesBetweenMonths(startMonth, endMonth);
       this.activeColumnField = '';
+      this.editingCellValue = '';
       this.fetchScheduleData();
       this.refreshNewTable();
     },
     handleCellClick({ row, column }) {
-      this.activeColumnField = column && column.field ? column.field : '';
+      const field = column && column.field ? column.field : '';
+      this.activeColumnField = this.dates.includes(field) ? field : '';
+      if (this.activeColumnField && row) {
+        this.editingCellValue = row[this.activeColumnField] || '';
+      }
       if (this.$refs.tableRef && row) {
         this.$refs.tableRef.setCurrentRow(row);
       }
+    },
+    handleHeaderCellClick({ column }) {
+      const field = column && column.field ? column.field : '';
+      this.activeColumnField = this.dates.includes(field) ? field : '';
+      this.editingCellValue = '';
     },
     getCellClassName({ column }) {
       return this.activeColumnField && column && column.field === this.activeColumnField
@@ -305,39 +336,25 @@ export default {
     },
     // 处理下拉选择变化
     handleSelectChange(row, date) {
-      const schedulingInfos = [];
-      this.tableData.forEach((row) => {
-        const { userName } = row;
-        this.dates.forEach((date) => {
-          if (row[date]) {
-             // 从date字符串中提取月份信息
-        const dateObj = new Date(date);
-        const year = dateObj.getFullYear();
-        const month = dateObj.getMonth() + 1; // 月份从0开始，所以需要+1
-        const formattedMonth = `${year}-${month < 10 ? '0' + month : month}`; // 格式化为yyyy-MM
-            schedulingInfos.push({
-              classes: row[date],
-              userName,
-              date,
-              month: formattedMonth, // 使用开始月份作为参考
-            });
-          }
-        });
-      });
+      const previousClasses = this.editingCellValue;
+      const payload = {
+        userName: row.userName,
+        date,
+        month: date.slice(0, 7),
+        classes: row[date] || ''
+      };
+      if (payload.classes === previousClasses) return;
+
       schedulingApi
-        .editScheduling({
-          startMonth: this.startMonth,
-          endMonth: this.endMonth,
-          schedulingInfos,
-        })
+        .editSchedulingCell(payload)
         .then(() => {
-          console.log("提交成功");
+          this.editingCellValue = payload.classes;
           this.refreshNewTable();
         })
         .catch((error) => {
-          Message.error("提交失败，请重试！");
-          this.refreshData();
-          console.error("提交失败:", error);
+          this.$set(row, date, previousClasses);
+          this.$message.error("保存失败，请重试！");
+          console.error("提交单元格排班失败:", error);
         });
     },
     // 根据日期获取星期几
@@ -526,7 +543,42 @@ export default {
 }
 .flexBox {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+.daily-shift-summary {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 9px;
+  overflow-x: auto;
+  background: #f5faff;
+  border: 1px solid #b8dcff;
+  border-radius: 4px;
+}
+.daily-shift-chip {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  color: #4a6077;
+  font-size: 12px;
+  line-height: 18px;
+  background: #fff;
+  border: 1px solid #dfebf7;
+  border-radius: 10px;
+}
+.daily-shift-chip b {
+  margin-left: 2px;
+  color: #2774be;
+}
+.daily-shift-chip--red,
+.daily-shift-chip--red b {
+  color: red;
+}
+.action-buttons {
+  flex: 0 0 auto;
 }
 .red-cell {
   color: red;

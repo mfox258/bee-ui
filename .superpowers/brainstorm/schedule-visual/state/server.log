@@ -1,0 +1,5 @@
+{"type":"server-started","port":58087,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:58087","screen_dir":"D:\\工程\\mfox\\bee-ui\\.superpowers\\brainstorm\\schedule-visual\\content","state_dir":"D:\\工程\\mfox\\bee-ui\\.superpowers\\brainstorm\\schedule-visual\\state"}
+{"type":"screen-added","file":"D:\\工程\\mfox\\bee-ui\\.superpowers\\brainstorm\\schedule-visual\\content\\schedule-summary-placement.html"}
+{"type":"screen-added","file":"D:\\工程\\mfox\\bee-ui\\.superpowers\\brainstorm\\schedule-visual\\content\\schedule-summary-placement-v2.html"}
+{"type":"screen-added","file":"D:\\工程\\mfox\\bee-ui\\.superpowers\\brainstorm\\schedule-visual\\content\\waiting-after-design.html"}
+{"type":"server-stopped","reason":"idle timeout"}
