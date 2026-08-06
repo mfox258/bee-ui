@@ -106,6 +106,7 @@ import schedulingApi from "@/api/scheduling";
 import axios from "axios";
 import "vxe-table/lib/style.css";
 import { mapGetters, mapMutations } from 'vuex'
+import sortDailyShiftCounts from '@/utils/schedulingShiftOrder'
 
 
 export default {
@@ -179,10 +180,10 @@ export default {
           counts[classes] = (counts[classes] || 0) + 1;
         }
       });
-      return Object.keys(counts).map((classes) => ({
+      return sortDailyShiftCounts(Object.keys(counts).map((classes) => ({
         classes,
         count: counts[classes]
-      }));
+      })));
     }
   },
   created() {
