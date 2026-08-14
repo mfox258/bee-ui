@@ -20,9 +20,15 @@
         </span>
       </div>
       <div class="action-buttons">
-        <el-button v-if="userName === 'admin'" type="primary" @click="openBatchEditDialog">批量排班</el-button>
         <el-button type="primary" @click="dialogVisible=true">打印</el-button>
-        <el-button type="primary" @click="exportExcel">导出 Excel</el-button>
+        <el-dropdown class="more-actions" trigger="click" @command="handleMoreAction">
+          <el-button type="primary">更多<i class="el-icon-arrow-down el-icon--right"></i></el-button>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item v-if="userName === 'admin'" command="batch">批量排班</el-dropdown-item>
+            <el-dropdown-item v-if="userName === 'admin'" command="operation">操作记录 / 回滚</el-dropdown-item>
+            <el-dropdown-item command="export">导出 Excel</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
       </div>
     </div>
     <!-- 表格 -->
@@ -98,6 +104,13 @@
       </span>
     </el-dialog>
     <el-dialog title="单人批量排班" :visible.sync="batchEditDialogVisible" width="560px" @closed="resetBatchEditForm">
+      <el-alert
+        class="batch-edit-warning"
+        title="批量编辑操作改动量很大，请谨慎操作！！！"
+        type="warning"
+        :closable="false"
+        show-icon>
+      </el-alert>
       <el-form label-width="92px">
         <el-form-item label="排班人员">
           <el-select v-model="batchEditForm.userName" filterable placeholder="请选择人员" style="width: 100%">
@@ -147,6 +160,45 @@
         <el-button type="primary" :loading="batchSubmitting" @click="submitBatchEdit">保存批量排班</el-button>
       </span>
     </el-dialog>
+    <el-dialog title="排班操作记录" :visible.sync="operationDialogVisible" width="900px" @open="fetchOperationList">
+      <el-table v-loading="operationListLoading" :data="operationList" border max-height="420">
+        <el-table-column prop="createTime" label="操作时间" width="170">
+          <template slot-scope="scope">{{ formatOperationTime(scope.row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column prop="operatorName" label="操作人" width="110"></el-table-column>
+        <el-table-column prop="targetUserName" label="排班人员" width="110"></el-table-column>
+        <el-table-column prop="operationType" label="操作类型" width="110"></el-table-column>
+        <el-table-column prop="itemCount" label="改动天数" width="90" align="center"></el-table-column>
+        <el-table-column label="状态" width="120">
+          <template slot-scope="scope">
+            <el-tag :type="scope.row.rollbackStatus === 1 ? 'info' : 'success'">
+              {{ scope.row.rollbackStatus === 1 ? '已回滚' : '可回滚' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" min-width="190" fixed="right">
+          <template slot-scope="scope">
+            <el-button size="mini" @click="viewOperationDetails(scope.row)">查看明细</el-button>
+            <el-button v-if="scope.row.rollbackStatus !== 1" size="mini" type="danger" :loading="rollingOperationId === scope.row.id" @click="confirmRollback(scope.row)">回滚</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="operation-history-tip">仅展示最近 50 条操作。回滚会恢复该条记录中的旧班次；若日期已被后续操作修改，系统会拒绝覆盖。</div>
+    </el-dialog>
+    <el-dialog title="操作明细" :visible.sync="operationDetailDialogVisible" width="620px">
+      <div v-if="selectedOperation" class="operation-detail-title">
+        {{ selectedOperation.targetUserName }} · {{ selectedOperation.operationType }} · {{ formatOperationTime(selectedOperation.createTime) }}
+      </div>
+      <el-table v-loading="operationDetailLoading" :data="operationDetails" border max-height="380">
+        <el-table-column prop="date" label="日期" width="150"></el-table-column>
+        <el-table-column prop="oldClasses" label="旧班次">
+          <template slot-scope="scope">{{ scope.row.oldClasses || '（空）' }}</template>
+        </el-table-column>
+        <el-table-column prop="newClasses" label="新班次">
+          <template slot-scope="scope">{{ scope.row.newClasses || '（空）' }}</template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -192,6 +244,14 @@ export default {
         pasteStartDate: '',
         pasteText: ''
       },
+      operationDialogVisible: false,
+      operationDetailDialogVisible: false,
+      operationListLoading: false,
+      operationDetailLoading: false,
+      rollingOperationId: null,
+      operationList: [],
+      operationDetails: [],
+      selectedOperation: null,
 
       dialogVisible: false,
       printDateRange: [],
@@ -274,15 +334,89 @@ export default {
     }
   },
   methods: {
-    fetchBatchUserOptions() {
-      return userApi.getUserPageList({ role: 1, pageIndex: 1, pageSize: 1000 })
+    handleMoreAction(command) {
+      if (command === 'batch') {
+        this.openBatchEditDialog();
+      } else if (command === 'operation') {
+        this.openOperationDialog();
+      } else if (command === 'export') {
+        this.exportExcel();
+      }
+    },
+    openOperationDialog() {
+      this.operationDialogVisible = true;
+    },
+    fetchOperationList() {
+      this.operationListLoading = true;
+      return schedulingApi.getSchedulingOperationList()
         .then((data) => {
-          const users = data && data.response && Array.isArray(data.response.list)
-            ? data.response.list
+          this.operationList = data && Array.isArray(data.response) ? data.response : [];
+        })
+        .catch((error) => {
+          console.error('获取排班操作记录失败:', error);
+        })
+        .finally(() => {
+          this.operationListLoading = false;
+        });
+    },
+    viewOperationDetails(operation) {
+      this.selectedOperation = operation;
+      this.operationDetails = [];
+      this.operationDetailDialogVisible = true;
+      this.operationDetailLoading = true;
+      schedulingApi.getSchedulingOperationDetails(operation.id)
+        .then((data) => {
+          this.operationDetails = data && Array.isArray(data.response) ? data.response : [];
+        })
+        .catch((error) => {
+          console.error('获取排班操作明细失败:', error);
+        })
+        .finally(() => {
+          this.operationDetailLoading = false;
+        });
+    },
+    confirmRollback(operation) {
+      this.$confirm(
+        `确定回滚“${operation.targetUserName}”于 ${this.formatOperationTime(operation.createTime)} 的 ${operation.operationType}吗？此操作会恢复 ${operation.itemCount} 天的旧班次。\n\n此操作不可逆，谨慎操作！！`,
+        '二次确认：不可逆操作',
+        {
+          confirmButtonText: '确认回滚',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      ).then(() => {
+        this.rollingOperationId = operation.id;
+        return schedulingApi.rollbackSchedulingOperation(operation.id);
+      }).then(() => {
+        this.$message.success('回滚成功');
+        this.fetchOperationList();
+        this.fetchScheduleData();
+        this.refreshNewTable();
+        if (this.selectedOperation && this.selectedOperation.id === operation.id) {
+          this.operationDetailDialogVisible = false;
+        }
+      }).catch((error) => {
+        if (error !== 'cancel' && error !== 'close') {
+          console.error('回滚排班操作失败:', error);
+        }
+      }).finally(() => {
+        this.rollingOperationId = null;
+      });
+    },
+    formatOperationTime(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      const pad = (number) => String(number).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    },
+    fetchBatchUserOptions() {
+      return schedulingApi.getActiveSchedulingUsers()
+        .then((data) => {
+          const users = data && Array.isArray(data.response)
+            ? data.response
             : [];
-          this.batchUserOptions = users
-            .map((user) => user.realName)
-            .filter((userName) => !!userName);
+          this.batchUserOptions = users.filter((userName) => !!userName);
         })
         .catch((error) => {
           console.error('获取批量排班人员失败:', error);
@@ -824,10 +958,25 @@ export default {
 .action-buttons {
   flex: 0 0 auto;
 }
+.more-actions {
+  margin-left: 8px;
+}
 .batch-edit-tip {
   color: #7a8491;
   font-size: 12px;
   line-height: 20px;
+}
+.batch-edit-warning {
+  margin-bottom: 16px;
+}
+.operation-history-tip {
+  margin-top: 12px;
+  color: #7a8491;
+  font-size: 12px;
+}
+.operation-detail-title {
+  margin-bottom: 12px;
+  color: #4a6077;
 }
 .red-cell {
   color: red;
