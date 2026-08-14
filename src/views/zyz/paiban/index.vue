@@ -1,6 +1,6 @@
 <template>
   <div class="container">
-    <div class="flexBox">
+    <div class="flexBox schedule-toolbar">
       <!-- 月份范围选择器 -->
       <el-date-picker
         v-model="monthRange"
@@ -20,13 +20,14 @@
         </span>
       </div>
       <div class="action-buttons">
+        <el-button v-if="userName === 'admin'" type="primary" @click="openBatchEditDialog">批量排班</el-button>
         <el-button type="primary" @click="dialogVisible=true">打印</el-button>
         <el-button type="primary" @click="exportExcel">导出 Excel</el-button>
       </div>
     </div>
     <!-- 表格 -->
-    <vxe-table ref="tableRef" :data="tableData" border style="width: 100%;margin-top:5px" :edit-config="this.userName==='admin'?{
-      trigger: 'click',
+    <vxe-table ref="tableRef" :data="tableData" border :height="scheduleTableHeight" style="width: 100%;margin-top:5px" :edit-config="this.userName==='admin'?{
+      trigger: 'manual',
       mode: 'cell'
     }:undefined" :row-config="{isCurrent: true}" :mouse-config="{highlight: true}" :cell-class-name="getCellClassName" :header-cell-class-name="getHeaderCellClassName" @cell-click="handleCellClick" @header-cell-click="handleHeaderCellClick">
       <vxe-table-column field="userName" title="姓名" fixed="left" width="80">
@@ -96,6 +97,56 @@
         <el-button type="primary" @click="printPaper">确定</el-button>
       </span>
     </el-dialog>
+    <el-dialog title="单人批量排班" :visible.sync="batchEditDialogVisible" width="560px" @closed="resetBatchEditForm">
+      <el-form label-width="92px">
+        <el-form-item label="排班人员">
+          <el-select v-model="batchEditForm.userName" filterable placeholder="请选择人员" style="width: 100%">
+            <el-option v-for="user in batchUserOptions" :key="user" :label="user" :value="user"></el-option>
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <el-tabs v-model="batchEditMode" type="border-card">
+        <el-tab-pane label="按日期范围填写" name="range">
+          <el-form label-width="92px">
+            <el-form-item label="日期范围">
+              <el-date-picker
+                v-model="batchEditForm.dateRange"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                format="yyyy-MM-dd"
+                value-format="yyyy-MM-dd"
+                style="width: 100%">
+              </el-date-picker>
+            </el-form-item>
+            <el-form-item label="班次">
+              <el-select v-model="batchEditForm.classes" filterable placeholder="请选择班次" style="width: 100%">
+                <el-option v-for="option in classOptions" :key="option" :label="option" :value="option"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <div class="batch-edit-tip">例如选择 8 月 1 日至 8 月 30 日并填写“休”，将一次性覆盖该人员这 30 天的班次。</div>
+        </el-tab-pane>
+        <el-tab-pane label="从 Excel 粘贴" name="paste">
+          <el-form label-width="92px">
+            <el-form-item label="开始日期">
+              <el-select v-model="batchEditForm.pasteStartDate" filterable placeholder="单列粘贴时从此日期开始" style="width: 100%">
+                <el-option v-for="date in dates" :key="date" :label="date" :value="date"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="粘贴内容">
+              <el-input v-model="batchEditForm.pasteText" type="textarea" :rows="8" placeholder="可直接从 Excel 复制：\n单列班次：休,休，休……（中英文逗号均可，从开始日期依次填写）\n两列日期和班次：2026-08-01 [Tab] 休"></el-input>
+            </el-form-item>
+          </el-form>
+          <div class="batch-edit-tip">单列用英文逗号或中文逗号分隔，按顺序填入；两列的第一列为日期、第二列为班次。空白班次会清空对应日期的已有班次。</div>
+        </el-tab-pane>
+      </el-tabs>
+      <span slot="footer">
+        <el-button :disabled="batchSubmitting" @click="batchEditDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="batchSubmitting" @click="submitBatchEdit">保存批量排班</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
@@ -119,6 +170,7 @@ export default {
       ],
       tableData: [],
       dates: [],
+      viewportHeight: window.innerHeight,
       classOptions: [],
       // 需要标红的班次选项
       redClassOptions: [],
@@ -127,6 +179,19 @@ export default {
       stasticTableData: [],
       activeColumnField: '',
       editingCellValue: '',
+      columnHighlightFrame: null,
+
+      batchEditDialogVisible: false,
+      batchEditMode: 'range',
+      batchSubmitting: false,
+      batchUserOptions: [],
+      batchEditForm: {
+        userName: '',
+        dateRange: [],
+        classes: '',
+        pasteStartDate: '',
+        pasteText: ''
+      },
 
       dialogVisible: false,
       printDateRange: [],
@@ -184,6 +249,9 @@ export default {
         classes,
         count: counts[classes]
       })));
+    },
+    scheduleTableHeight() {
+      return Math.max(360, this.viewportHeight - 220);
     }
   },
   created() {
@@ -191,8 +259,159 @@ export default {
     this.initPage();
     this.refreshNewTable();
     this.fetchClassTagRed();
+    if (this.userName === 'admin') {
+      this.fetchBatchUserOptions();
+    }
+  },
+  mounted() {
+    this.viewportHeight = window.innerHeight;
+    window.addEventListener('resize', this.updateScheduleTableHeight);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.updateScheduleTableHeight);
+    if (this.columnHighlightFrame) {
+      window.cancelAnimationFrame(this.columnHighlightFrame);
+    }
   },
   methods: {
+    fetchBatchUserOptions() {
+      return userApi.getUserPageList({ role: 1, pageIndex: 1, pageSize: 1000 })
+        .then((data) => {
+          const users = data && data.response && Array.isArray(data.response.list)
+            ? data.response.list
+            : [];
+          this.batchUserOptions = users
+            .map((user) => user.realName)
+            .filter((userName) => !!userName);
+        })
+        .catch((error) => {
+          console.error('获取批量排班人员失败:', error);
+          this.batchUserOptions = this.tableData.map((row) => row.userName);
+        });
+    },
+    openBatchEditDialog() {
+      this.batchEditForm.userName = '';
+      this.batchEditDialogVisible = true;
+    },
+    resetBatchEditForm() {
+      this.batchEditMode = 'range';
+      this.batchSubmitting = false;
+      this.batchEditForm = {
+        userName: '',
+        dateRange: [],
+        classes: '',
+        pasteStartDate: '',
+        pasteText: ''
+      };
+    },
+    getRangeBatchItems() {
+      const dateRange = this.batchEditForm.dateRange;
+      if (!dateRange || dateRange.length !== 2) {
+        throw new Error('请选择日期范围');
+      }
+      if (!this.batchEditForm.classes) {
+        throw new Error('请选择班次');
+      }
+      const items = this.dates
+        .filter((date) => date >= dateRange[0] && date <= dateRange[1])
+        .map((date) => ({ date, classes: this.batchEditForm.classes }));
+      if (!items.length || items.length !== this.getDateCount(dateRange[0], dateRange[1])) {
+        throw new Error('日期范围必须在当前展示的月份内');
+      }
+      return items;
+    },
+    getDateCount(startDate, endDate) {
+      const start = new Date(`${startDate}T00:00:00`);
+      const end = new Date(`${endDate}T00:00:00`);
+      return Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+    },
+    normalizePastedDate(value) {
+      const match = String(value || '').trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+      if (!match) return '';
+      return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+    },
+    getPasteBatchItems() {
+      const text = this.batchEditForm.pasteText.replace(/\r/g, '');
+      const lines = text.split('\n');
+      while (lines.length && lines[lines.length - 1] === '') {
+        lines.pop();
+      }
+      if (!lines.length) {
+        throw new Error('请粘贴班次内容');
+      }
+      const hasDateColumn = lines.some((line) => line.includes('\t'));
+      const items = [];
+      if (hasDateColumn) {
+        lines.forEach((line, index) => {
+          const cells = line.split('\t');
+          if (cells.length < 2) {
+            throw new Error(`第 ${index + 1} 行需要“日期 + 班次”两列内容`);
+          }
+          const date = this.normalizePastedDate(cells[0]);
+          if (!date || !this.dates.includes(date)) {
+            throw new Error(`第 ${index + 1} 行日期不在当前展示范围内`);
+          }
+          items.push({ date, classes: cells[1].trim(), sourcePosition: `第 ${index + 1} 行` });
+        });
+      } else {
+        const classesList = text.split(/[,，、\n]+/).map((classes) => classes.trim()).filter((classes) => classes);
+        if (!classesList.length) {
+          throw new Error('请粘贴班次内容');
+        }
+        const startIndex = this.dates.indexOf(this.batchEditForm.pasteStartDate);
+        if (startIndex < 0) {
+          throw new Error('请选择开始日期');
+        }
+        if (startIndex + classesList.length > this.dates.length) {
+          throw new Error('粘贴的班次数量超出当前展示日期范围');
+        }
+        classesList.forEach((classes, index) => {
+          items.push({ date: this.dates[startIndex + index], classes, sourcePosition: `第 ${index + 1} 个班次` });
+        });
+      }
+      const dateSet = new Set(items.map((item) => item.date));
+      if (dateSet.size !== items.length) {
+        throw new Error('同一天只能填写一次班次');
+      }
+      const invalidItem = items.find((item) => item.classes && !this.classOptions.includes(item.classes));
+      if (invalidItem) {
+        throw new Error(`${invalidItem.sourcePosition}（${invalidItem.date}）填写的班次“${invalidItem.classes}”不存在或已停用`);
+      }
+      return items;
+    },
+    submitBatchEdit() {
+      if (!this.batchEditForm.userName) {
+        this.$message.warning('请选择排班人员');
+        return;
+      }
+      let items;
+      try {
+        items = this.batchEditMode === 'range' ? this.getRangeBatchItems() : this.getPasteBatchItems();
+      } catch (error) {
+        this.$message.warning(error.message);
+        return;
+      }
+      this.batchSubmitting = true;
+      schedulingApi.batchEditScheduling({
+        userName: this.batchEditForm.userName,
+        items: items.map((item) => ({ date: item.date, classes: item.classes }))
+      }).then(() => {
+        this.$message.success(`已保存 ${items.length} 天排班`);
+        this.batchEditDialogVisible = false;
+        this.fetchScheduleData();
+        this.refreshNewTable();
+      }).catch((error) => {
+        if (!error) {
+          this.$message.error('批量保存失败，请重试！');
+        }
+        console.error('提交批量排班失败:', error);
+      }).finally(() => {
+        this.batchSubmitting = false;
+      });
+    },
+    updateScheduleTableHeight() {
+      this.viewportHeight = window.innerHeight;
+    },
     // 获取两个月份之间的所有日期 - 修复版本
     getDatesBetweenMonths(startMonth, endMonth) {
       const dates = [];
@@ -312,18 +531,28 @@ export default {
     },
     handleCellClick({ row, column }) {
       const field = column && column.field ? column.field : '';
-      this.activeColumnField = this.dates.includes(field) ? field : '';
-      if (this.activeColumnField && row) {
-        this.editingCellValue = row[this.activeColumnField] || '';
+      const dateField = this.dates.includes(field) ? field : '';
+      if (dateField && row) {
+        this.editingCellValue = row[dateField] || '';
+        if (this.userName === 'admin' && this.$refs.tableRef) {
+          this.$refs.tableRef.setEditCell(row, dateField);
+        }
       }
-      if (this.$refs.tableRef && row) {
-        this.$refs.tableRef.setCurrentRow(row);
-      }
+      this.updateActiveColumn(dateField);
     },
     handleHeaderCellClick({ column }) {
       const field = column && column.field ? column.field : '';
-      this.activeColumnField = this.dates.includes(field) ? field : '';
+      this.updateActiveColumn(this.dates.includes(field) ? field : '');
       this.editingCellValue = '';
+    },
+    updateActiveColumn(field) {
+      if (this.columnHighlightFrame) {
+        window.cancelAnimationFrame(this.columnHighlightFrame);
+      }
+      this.columnHighlightFrame = window.requestAnimationFrame(() => {
+        this.activeColumnField = field;
+        this.columnHighlightFrame = null;
+      });
     },
     getCellClassName({ column }) {
       return this.activeColumnField && column && column.field === this.activeColumnField
@@ -345,6 +574,11 @@ export default {
         classes: row[date] || ''
       };
       if (payload.classes === previousClasses) return;
+      if (payload.classes && !this.classOptions.includes(payload.classes)) {
+        this.$set(row, date, previousClasses);
+        this.$message.warning(`日期 ${date} 填写的班次“${payload.classes}”不存在或已停用`);
+        return;
+      }
 
       schedulingApi
         .editSchedulingCell(payload)
@@ -354,7 +588,9 @@ export default {
         })
         .catch((error) => {
           this.$set(row, date, previousClasses);
-          this.$message.error("保存失败，请重试！");
+          if (!error) {
+            this.$message.error("保存失败，请重试！");
+          }
           console.error("提交单元格排班失败:", error);
         });
     },
@@ -548,6 +784,13 @@ export default {
   justify-content: space-between;
   gap: 12px;
 }
+.schedule-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 4px 0 8px;
+  background: #fff;
+}
 .daily-shift-summary {
   display: flex;
   flex: 1;
@@ -580,6 +823,11 @@ export default {
 }
 .action-buttons {
   flex: 0 0 auto;
+}
+.batch-edit-tip {
+  color: #7a8491;
+  font-size: 12px;
+  line-height: 20px;
 }
 .red-cell {
   color: red;
