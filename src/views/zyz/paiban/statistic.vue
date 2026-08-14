@@ -116,7 +116,7 @@
 <script>
 import schedulingApi from "@/api/scheduling";
 import classesApi from "@/api/classes";
-import XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 import { mapGetters } from 'vuex';
 import axios from 'axios'; // 直接导入axios库
 
