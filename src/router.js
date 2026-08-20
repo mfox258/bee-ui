@@ -95,6 +95,12 @@ const constantRoutes = [
         component: () => import('@/views/zyz/paiban/statistic'),
         name: 'Temp',
         meta: { title: '排班统计', noCache: true }
+      },
+      {
+        path: 'performance-accounting',
+        component: () => import('@/views/zyz/performance-accounting/index'),
+        name: 'PerformanceAccounting',
+        meta: { title: '绩效核算' }
       }
     ]
   },
